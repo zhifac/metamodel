@@ -22,12 +22,18 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.metamodel.data.SimpleDataSetHeader;
+import org.apache.metamodel.schema.Column;
+import org.apache.metamodel.schema.ColumnType;
+import org.apache.metamodel.schema.MutableColumn;
 import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.hssf.usermodel.HSSFFont;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
@@ -422,21 +428,37 @@ final class ExcelUtils {
      * @return
      */
     public static DefaultRow createRow(Workbook workbook, Row row, DataSetHeader header) {
-        final int size = header.size();
-        final String[] values = new String[size];
-        final Style[] styles = new Style[size];
+        int size = header.size();
+        String[] values = new String[0];
+        Style[] styles = null;
+        DataSetHeader hdr = header;
         if (row != null) {
+            if (size == 0) {
+                size = row.getPhysicalNumberOfCells();
+            }
+            values = new String[size];
+            styles = new Style[size];
+            List<Column> cols = new ArrayList<>();
             for (int i = 0; i < size; i++) {
-                final int columnNumber = header.getSelectItem(i).getColumn().getColumnNumber();
+                int columnNumber = i;
+                if (header.size() > 0) {
+                    columnNumber = header.getSelectItem(i).getColumn().getColumnNumber();
+                } else {
+                    String columnName = "[Column " + (columnNumber + 1) + "]";
+                    cols.add(new MutableColumn(columnName, ColumnType.STRING, null, columnNumber, true));
+                }
                 final Cell cell = row.getCell(columnNumber);
                 final String value = ExcelUtils.getCellValue(workbook, cell);
                 final Style style = ExcelUtils.getCellStyle(workbook, cell);
                 values[i] = value;
                 styles[i] = style;
             }
+            if (header.size() == 0) {
+                hdr = new SimpleDataSetHeader(cols.toArray(new Column[cols.size()]));
+            }
         }
 
-        return new DefaultRow(header, values, styles);
+        return new DefaultRow(hdr, values, styles);
     }
 
     public static DataSet getDataSet(Workbook workbook, Sheet sheet, Table table, ExcelConfiguration configuration) {
